@@ -97,11 +97,11 @@ backup() {
     then
 	log executing PRECOMMAND $PRECOMMAND
 	echo $PRECOMMAND | sh
-    rc=$?
-    if [ $rc != 0 ];
-    then
-        exit_error GIVING UP PRECOMMAND FAILED : $PRECOMMAND
-    fi
+	rc=$?
+	if [ $rc != 0 ];
+	then
+            exit_error GIVING UP PRECOMMAND FAILED : $PRECOMMAND
+	fi
     fi
 
     if [ -n "$DIRS" ];
@@ -157,9 +157,16 @@ backup() {
     log Repository Content
     borg list $SUPPARGS
 
+
     if [ -n "$POSTCOMMAND" ];
     then
+	log executing POSTCOMMAND $POSTCOMMAND
 	echo $POSTCOMMAND | sh
+	rc=$?
+	if [ $rc != 0 ];
+	then
+            exit_error POSTCOMMAND FAILED : $POSTCOMMAND
+	fi
     fi
     log ENDING BACKUP on $HOSTNAME at `date`
 }

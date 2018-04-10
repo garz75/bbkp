@@ -5,12 +5,12 @@
 
 # BORG_PASSPHRASE: required (environment variable, export it): set it
 # here or else where in the script environment
-export BORG_PASSPHRASE='misdeed-washtub-pacific-shadow'
+export BORG_PASSPHRASE='This is very secret'
 
 # REMOTE_LOGIN: required: SSH login name on the remote server. The
 # public key of the local user (root) must be declared for this user
 # on the remote host (see below)
-REMOTE_LOGIN=12329
+REMOTE_LOGIN=XXXXXXX
 
 # REMOTE_HOST: required: SSH remote host name
 REMOTE_HOST=ch-s012.rsync.net
@@ -26,23 +26,34 @@ export BORG_REPO="ssh://$REMOTE_LOGIN@$REMOTE_HOST/~/$REMOTE_PATH"
 # EMAIL: optional :this script output goes into a file in the log
 # directory. If EMAIL is defined, also send it to this email address
 # (ssmtp client required) 
-#EMAIL=crons@garzon.fr
+#EMAIL=somebody@example.com
 
 
 
 #################################################################
 # Stuff to backup: 
 
-# Command to run before the backup
+# Command to run before the backup, if you need to 
 #PRECOMMAND="/root/bkp/etc/pre_server_backup.sh"
 
-#Directories
-#DIRS="/etc /root /home/garzon"
+
+# DIRS: required: list of directory to backup . To exclude files from
+# the backup, you can add a file etc/`hostname -f`.excludes using the borg
+# backup patterns, see borg documentation 
+
+# DIRS="/etc /root /home/garzon"
 DIRS="/root"
 
-#Mysql DBs
+# MYSQL_DB, MYSQL_DB_USER, MYSQL_DB_PASSWORD : arrays of MySQL DB
+# names, usernames and password to backup. Leave it empty if you don't
+# need it
+
+MYSQL_DB=()
 #MYSQL_DB=(fail2ban piwigo zabbix)
-MYSQL_DB=(fail2ban piwigo)
 MYSQL_DB_USER=("garzon" "piwigo" "zabbix")
-MYSQL_DB_PASSWORD=("le*pass" "le*pass" "le*pass" )
+MYSQL_DB_PASSWORD=("secret" "secret" "secret" )
+
+# Command to run AFTER the backup, if you need to 
+#POSTCOMMAND="/root/bkp/etc/post_server_backup.sh"
+
 
