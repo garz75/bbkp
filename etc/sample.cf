@@ -1,0 +1,48 @@
+##############################################################
+# bbkp configuration file: must be named etc/`hostname -f`.cf
+##############################################################
+# Connection settings to the remote directory
+
+# BORG_PASSPHRASE: required (environment variable, export it): set it
+# here or else where in the script environment
+export BORG_PASSPHRASE='misdeed-washtub-pacific-shadow'
+
+# REMOTE_LOGIN: required: SSH login name on the remote server. The
+# public key of the local user (root) must be declared for this user
+# on the remote host (see below)
+REMOTE_LOGIN=12329
+
+# REMOTE_HOST: required: SSH remote host name
+REMOTE_HOST=ch-s012.rsync.net
+
+
+# REMOTE_PATH: required. THE $HOSTNAME varialble can be used here. The
+# full directory will be created by the bbkp init command
+REMOTE_PATH=backup/borg/$HOSTNAME 
+
+# BORG_REPO: required . you should leave it like this...
+export BORG_REPO="ssh://$REMOTE_LOGIN@$REMOTE_HOST/~/$REMOTE_PATH"
+
+# EMAIL: optional :this script output goes into a file in the log
+# directory. If EMAIL is defined, also send it to this email address
+# (ssmtp client required) 
+#EMAIL=crons@garzon.fr
+
+
+
+#################################################################
+# Stuff to backup: 
+
+# Command to run before the backup
+#PRECOMMAND="/root/bkp/etc/pre_server_backup.sh"
+
+#Directories
+#DIRS="/etc /root /home/garzon"
+DIRS="/root"
+
+#Mysql DBs
+#MYSQL_DB=(fail2ban piwigo zabbix)
+MYSQL_DB=(fail2ban piwigo)
+MYSQL_DB_USER=("garzon" "piwigo" "zabbix")
+MYSQL_DB_PASSWORD=("le*pass" "le*pass" "le*pass" )
+

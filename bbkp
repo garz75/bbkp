@@ -1,0 +1,202 @@
+#!/bin/bash
+
+USAGE=<<EOF
+
+Daily backup script using borg (files and DB) to a remotely accessible repository (ssh). 
+If verbose is not set (see below), it will be silent, creating a log file in
+BBKP_BASE/log, and optionally sends it to \$EMAIL. If verbose, uses
+STDOUT and show progress in the borg commands
+
+Commands: 
+
+# bbkp init [verbose]
+
+Initialize the borg repo for this machine, based on conf info (borg
+hostname, key, etc.) found in $BKP_BASE/etc/$hostname.cf
+
+# bbkp backup [verbose]
+
+Creates a daily rsync.net borg backup for this machine, based on
+$BKP_BASE/etc/$hostname.cf. This automatically prunes to 4 weekly
+and 7 daily (could be configurable...)
+
+EOF
+
+
+HOSTNAME=`hostname -f`
+
+BKP_BASE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+ETC=$BKP_BASE/etc
+CF=$ETC/$HOSTNAME.cf
+EXCLUDES=$ETC/$HOSTNAME.excludes
+LOG=$BKP_BASE/log/bbkp-$HOSTNAME-`date +%Y-%m-%d-%H:%M:%S`-$1.log
+MARK="########## "
+SUPPARGS="$SUPPARGS --remote-path=borg1 --error "
+
+if [ ! -f $CF ];
+then exit_error "$f does not exist"
+fi
+
+
+# Source the configuration file
+. $CF
+
+log(){
+    echo $MARK `date` - $*
+}
+
+exit_error(){
+    log ERROR ERROR ERROR ERROR ERROR ERROR ERROR ERROR ERROR 
+    log $*
+    log EXITING	with error 1
+    myexit 1 
+}	
+
+myexit() {
+    if [ -z "$VERBOSE" -a -n "$EMAIL"  ];
+    then
+	log Sending log report to $EMAIL
+        /sbin/ssmtp -t < $LOG
+    fi
+    exit $*
+} 
+
+
+test -z "$1" &&  exit_error "Missing first argument" 
+
+# add 2nd argument to prevent redirecting to log file
+VERBOSE=$2
+if [ -z "$VERBOSE" ];
+then
+    # redirecting output to $LOG
+    exec >> $LOG 2>&1
+    # Setting the header for the email we may sent at the end of the script... see myexit
+    echo "Subject: [$HOSTNAME bbkp] $1"
+    echo "To: BKP <$EMAIL>"
+    echo 
+else
+	log Being verbose: show progress
+	SUPPARGS="$SUPPARGS --progress "
+fi
+
+
+
+
+
+log STARTING $0 $1 at `date`
+
+
+backup() {
+    check=`ssh $REMOTE_LOGIN@$REMOTE_HOST ls  $REMOTE_PATH/README`
+    t=$?
+    if [ $t -ne 0 ];
+    then
+        exit_error "$BORG_REPO does not exist on the server, first initialize the repo"
+    fi
+    if [ -n "$PRECOMMAND" ];
+    then
+	log executing PRECOMMAND $PRECOMMAND
+	echo $PRECOMMAND | sh
+    rc=$?
+    if [ $rc != 0 ];
+    then
+        exit_error GIVING UP PRECOMMAND FAILED : $PRECOMMAND
+    fi
+    fi
+
+    if [ -n "$DIRS" ];
+    then
+	log backuping directories $DIRS
+	if [ -f "$EXCLUDES" ];
+	    then EXC="--exclude-from $EXCLUDES"
+	fi
+	set -x
+	borg create $SUPPARGS $EXC --stats --compression lzma ::files-{hostname}-{now} $DIRS
+	rc=$?
+	set +x
+	if [ $rc != 0 ];
+	then
+            exit_error ERROR CREATING BACKUP for DIRS $DIRS
+	fi
+	## Pruning
+	set -x
+	borg prune $SUPPARGS -v --keep-daily=7 --keep-weekly=4 --prefix files-{hostname}
+	rc=$?
+	set +x
+	if [ $rc != 0 ];
+	then
+            exit_error ERROR PRUNING the Borg Repository for files to backup on $HOSTNAME
+	fi
+    fi
+
+    size=${#MYSQL_DB[*]} 
+    for i in `seq 0 $[$size - 1]`
+    do 
+	log "Backuping mysql db ${MYSQL_DB[$i]}"
+	set -x
+	mysqldump --add-drop-table -h localhost --user=${MYSQL_DB_USER[$i]} --password=${MYSQL_DB_PASSWORD[$i]} ${MYSQL_DB[$i]} \
+                    | borg create $SUPPARGS --stats --compression lzma  ::mysql-{hostname}-${MYSQL_DB[$i]}-{now} -
+ 	rc=$?
+	set +x
+	if [ $rc != 0 ];
+	then
+            exit_error ERROR BACKUPIN DB ${MYSQL_DB[$i]}
+	fi
+	log Pruning
+	set -x
+	borg prune $SUPPARGS -v --keep-daily=7 --keep-weekly=4 --prefix mysql-{hostname}-${MYSQL_DB[$i]}
+	rc=$?
+	set +x
+	if [ $rc != 0 ];
+	then
+            exit_error ERROR PRUNING the Borg Repository for mysql db ${MYSQL_DB[$i]} 
+	fi
+    done
+    
+    # Info
+    log Repository Content
+    borg list $SUPPARGS
+
+    if [ -n "$POSTCOMMAND" ];
+    then
+	echo $POSTCOMMAND | sh
+    fi
+    log ENDING BACKUP on $HOSTNAME at `date`
+}
+
+
+init_repo() { 
+    log Checking if repository dir exists on the server
+    check=`ssh $REMOTE_LOGIN@$REMOTE_HOST ls  $REMOTE_PATH`
+    t=$?
+    if [ $t -eq 0 ];
+    then 
+	exit_error "$REMOTE_PATH already exists on the server, first remove it to initialize the repo"
+    fi
+    e=`ssh $REMOTE_LOGIN@$REMOTE_HOST mkdir -p  $REMOTE_PATH`
+    if [ $? -ne 0 ];
+    then exit_error could not mkdir $REMOTE_PATH on the server : $e
+    fi
+    log initializing the repo $BORG_REPO 
+    
+    borg init $SUPPARGS -v --encryption=repokey
+    log ENDING INIT on $HOSTNAME at `date`
+}
+
+if [ -z "$BORG_PASSPHRASE" ];
+then exit_error "Missing BORG_PASSPHRASE in configuration file $CF"
+fi
+
+
+if [ "$1" = "init" ];
+then 
+    init_repo
+else 
+    if [ "$1" = "backup" ];
+    then 
+	backup
+    else exit_error "$0 init|backup [verbose]"
+    fi
+fi
+
+myexit 0
