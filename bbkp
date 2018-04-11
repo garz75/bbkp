@@ -34,12 +34,15 @@ MARK="########## "
 SUPPARGS="$SUPPARGS --remote-path=borg1 --error "
 
 if [ ! -f $CF ];
-then exit_error "$f does not exist"
+then 
+    echo "$CF does not exist"
+    exit 1
 fi
 
 
 # Source the configuration file
 . $CF
+
 
 log(){
     echo $MARK `date` - $*
