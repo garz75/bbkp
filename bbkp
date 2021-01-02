@@ -59,7 +59,7 @@ myexit() {
     if [ -z "$VERBOSE" -a -n "$EMAIL"  ];
     then
 	log Sending log report to $EMAIL
-        /sbin/ssmtp -t < $LOG
+        sendmail -t < $LOG
     fi
     exit $*
 } 
